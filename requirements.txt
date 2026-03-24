@@ -1,4 +1,4 @@
-pyrogram==2.0.106
-requests==2.31.0
-Pillow==10.1.0
-tgcrypto==1.2.5
+pyrogram
+requests
+Pillow
+tgcrypto
