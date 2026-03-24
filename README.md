@@ -32,7 +32,7 @@
 ## 📸 Screenshots
 
 <div align="center">
-  <img src="https://via.placeholder.com/400x800?text=Parallel+Upload+Demo" alt="Demo Screenshot" width="300">
+  <img src="https://i.ibb.co.com/mCx78DTg/Screenshot-20260324-195945-org-telegram-messenger.jpg" alt="Demo Screenshot" width="300">
   <br>
   <em>All videos processing simultaneously!</em>
 </div>
