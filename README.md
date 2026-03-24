@@ -105,7 +105,7 @@ https://example.com/video3.mp4
 2. Reply with `/thumb`
 3. ✅ Thumbnail saved!
 
---
+---
 
 🛠️ Deployment
 
@@ -122,16 +122,16 @@ Deploy on Render
    ```
 4. Build Command:
    ```bash
-pip install -r requirements.txt && apt-get update && apt-get install -y ffmpeg
+   pip install -r requirements.txt && apt-get update && apt-get install -y ffmpeg
    ```
 5. Start Command:
    ```bash
-   python3 bot.py
+   python bot.py
    ```
 
 Deploy Locally
 
-```
+```bash
 # Clone repository
 git clone https://github.com/RAHAT11790/URL-UPLOAD-BOT
 cd URL-UPLOAD-BOT
@@ -163,7 +163,6 @@ Pillow==10.1.0
 ⚠️ ffmpeg is a system dependency, not a Python package. Install it separately using the commands above.
 
 ---
-
 🌟 How It Works
 
 ```
