@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: video-uploader-bot
+    runtime: python
+    repo: https://github.com/yourusername/video-uploader-bot  # আপনার রিপোজিটরি লিংক দিন
+    plan: free
+    region: singapore  # বা oregon, frankfurt যেখানে ইচ্ছা
+    branch: main
+    buildCommand: |
+      pip install -r requirements.txt
+      apt-get update && apt-get install -y ffmpeg
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TZ
+        value: Asia/Dhaka
