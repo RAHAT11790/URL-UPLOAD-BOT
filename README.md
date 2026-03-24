@@ -41,16 +41,14 @@
 
 ## 🔧 Commands
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Show bot information and help |
-| `/rename <pattern>` | Set episode rename pattern |
-| `/thumb` | Set custom thumbnail (reply to photo) |
-| `/showthumb` | Show current thumbnail |
-| `/delthumb` | Delete thumbnail |
-| `/reset` | Reset episode counter to 1 |
-| `/finish` | Process all queued URLs |
-| `/cancel` | Clear queue |
+start - Show bot information and help
+rename - Set episode rename pattern
+thumb - Set custom thumbnail (reply to photo)
+showthumb - Show current thumbnail
+delthumb - Delete thumbnail
+reset - Reset episode counter to 1
+finish - Process all queued URLs
+cancel - Clear queue
 
 ---
 
