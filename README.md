@@ -105,60 +105,48 @@ https://example.com/video3.mp4
 2. Reply with `/thumb`
 3. ✅ Thumbnail saved!
 
----
+--
 
-## 🛠️ Deployment
+🛠️ Deployment
 
-### Deploy on Render
+Deploy on Render
 
-1. **Fork this repository**
-
-2. **Create a new Web Service on Render**
-
-3. **Environment Variables:**
-```
-
-TG_BOT_TOKEN = your_bot_token
-APP_ID = your_app_id
-API_HASH = your_api_hash
-AUTH_USERS = 8350605421,6621572366
-
-```
-
-4. **Build Command:**
+1. Fork this repository
+2. Create a new Web Service on Render
+3. Environment Variables:
    ```
- pip install -r requirements.txt
-apt-get update && apt-get install -y ffmpeg
-
-```
-
-1. Start Command:
-
-```
-python bot.py
-
-```
+   TG_BOT_TOKEN = your_bot_token
+   APP_ID = your_app_id
+   API_HASH = your_api_hash
+   AUTH_USERS = 8350605421,6621572366
+   ```
+4. Build Command:
+   ```bash
+pip install -r requirements.txt && apt-get update && apt-get install -y ffmpeg
+   ```
+5. Start Command:
+   ```bash
+   python3 bot.py
+   ```
 
 Deploy Locally
 
-# Clone repository
 ```
+# Clone repository
 git clone https://github.com/RAHAT11790/URL-UPLOAD-BOT
 cd URL-UPLOAD-BOT
-```
+
 # Install dependencies
-```
 pip install -r requirements.txt
-```
+
 # Install ffmpeg
 # Ubuntu/Debian:
-```
 sudo apt-get install ffmpeg -y
-```
+
 # Windows: Download from https://ffmpeg.org/download.html
+# Add ffmpeg to system PATH after installation
 
 # Run bot
-```
 python bot.py
 ```
 
@@ -170,8 +158,9 @@ python bot.py
 pyrogram==2.0.106
 requests==2.31.0
 Pillow==10.1.0
-ffmpeg (system dependency)
 ```
+
+⚠️ ffmpeg is a system dependency, not a Python package. Install it separately using the commands above.
 
 ---
 
