@@ -127,13 +127,13 @@ AUTH_USERS = 8350605421,6621572366
 
 4. **Build Command:**
    ```
-   bash
-   pip install -r requirements.txt
-   apt-get update && apt-get install -y ffmpeg
+ pip install -r requirements.txt
+apt-get update && apt-get install -y ffmpeg
 
 ```
 
 1. Start Command:
+
 ```
 python bot.py
 
@@ -141,20 +141,24 @@ python bot.py
 
 Deploy Locally
 
-```
 # Clone repository
+```
 git clone https://github.com/RAHAT11790/URL-UPLOAD-BOT
 cd URL-UPLOAD-BOT
-
+```
 # Install dependencies
+```
 pip install -r requirements.txt
-
+```
 # Install ffmpeg
 # Ubuntu/Debian:
+```
 sudo apt-get install ffmpeg -y
+```
 # Windows: Download from https://ffmpeg.org/download.html
 
 # Run bot
+```
 python bot.py
 ```
 
