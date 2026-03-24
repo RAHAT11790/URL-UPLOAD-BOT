@@ -126,19 +126,22 @@ AUTH_USERS = 8350605421,6621572366
 ```
 
 4. **Build Command:**
-   ```bash
+   ```
+   bash
    pip install -r requirements.txt
    apt-get update && apt-get install -y ffmpeg
+
 ```
 
 1. Start Command:
-   ```bash
-   python bot.py
-   ```
+```
+python bot.py
+
+```
 
 Deploy Locally
 
-```bash
+```
 # Clone repository
 git clone https://github.com/RAHAT11790/URL-UPLOAD-BOT
 cd URL-UPLOAD-BOT
