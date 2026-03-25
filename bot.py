@@ -3,12 +3,14 @@ import time
 import requests
 import asyncio
 import re
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import FloodWait
 from PIL import Image
 
-# Config - Use environment variables for security
+# Config
 class Config:
     TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "8519451434:AAFQPiKXYjdiHzTyIIVwi9zxwzmupEevOcw")
     APP_ID = int(os.environ.get("APP_ID", 25976192))
@@ -34,9 +36,10 @@ user_thumb = {}
 user_rename_pattern = {}
 user_episode_counter = {}
 user_batch_urls = {}
+active_tasks = {}
 
 # Progress bar function
-def progress_bar(current, total, filename="", status="UPLOADING", episode=""):
+def progress_bar(current, total, status="UPLOADING", episode=""):
     if total == 0:
         return f"{episode}\n**{status}**\n┌─────────────────────┐\n│████████████████████│\n└─────────────────────┘\n**Processing...**"
     
@@ -54,12 +57,20 @@ def progress_bar(current, total, filename="", status="UPLOADING", episode=""):
 └─────────────────────┘
 **{percentage:.1f}%** | **{current_mb:.2f} MB** / **{total_mb:.2f} MB**"""
 
-# Get file info from URL
-def get_file_info(url):
+# Get filename from URL or headers
+def get_filename_from_url(url):
     try:
+        # First try to get filename from headers
         response = requests.head(url, allow_redirects=True, timeout=10)
-        content_length = int(response.headers.get('content-length', 0))
+        content_disposition = response.headers.get('content-disposition', '')
         
+        # Extract filename from content-disposition
+        if 'filename=' in content_disposition:
+            filename = re.findall('filename="?([^"]+)"?', content_disposition)
+            if filename:
+                return filename[0]
+        
+        # If not found, get from URL
         filename = url.split('/')[-1]
         if '?' in filename:
             filename = filename.split('?')[0]
@@ -68,12 +79,28 @@ def get_file_info(url):
         if not filename or filename == '':
             filename = f"video_{int(time.time())}.mp4"
         
+        return filename
+    except:
+        return None
+
+# Get file info from URL
+def get_file_info(url):
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=10)
+        content_length = int(response.headers.get('content-length', 0))
+        filename = get_filename_from_url(url)
+        
+        if not filename:
+            filename = f"video_{int(time.time())}.mp4"
+        
+        # Ensure .mp4 extension for video
         if not filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm')):
             filename = f"{filename}.mp4"
         
         return {
             'filename': filename,
-            'size': content_length
+            'size': content_length,
+            'url': url
         }
     except:
         return None
@@ -82,7 +109,7 @@ def get_file_info(url):
 def generate_episode_name(pattern, episode_num):
     return pattern.replace("{episode}", str(episode_num))
 
-# Process single video with full parallel capability
+# Process single video with parallel upload
 async def process_video_parallel(client, user_id, url, filename, thumb_path, episode_num, total_count):
     download_path = None
     episode_text = f"**🎬 Episode {episode_num}/{total_count}**"
@@ -90,7 +117,7 @@ async def process_video_parallel(client, user_id, url, filename, thumb_path, epi
     try:
         download_path = f"{Config.DOWNLOAD_LOCATION}/{user_id}_{int(time.time())}_{episode_num}.mp4"
         
-        # Create status message for this video
+        # Create status message
         status_msg = await client.send_message(user_id, f"{episode_text}\n📥 **DOWNLOADING**\n┌─────────────────────┐\n│░░░░░░░░░░░░░░░░░░░░│\n└─────────────────────┘\n**0%** | **0.00 MB** / **0.00 MB**")
         
         # Download with progress
@@ -125,7 +152,7 @@ async def process_video_parallel(client, user_id, url, filename, thumb_path, epi
                             pass
                         last_update = time.time()
         
-        # Download complete, start upload immediately
+        # Start upload immediately
         await status_msg.edit_text(f"{episode_text}\n📤 **UPLOADING**\n┌─────────────────────┐\n│░░░░░░░░░░░░░░░░░░░░│\n└─────────────────────┘\n**0%** | **0.00 MB** / **0.00 MB**")
         
         last_progress_update = time.time()
@@ -134,19 +161,20 @@ async def process_video_parallel(client, user_id, url, filename, thumb_path, epi
             nonlocal last_progress_update
             now = time.time()
             if now - last_progress_update >= 1 or current == total:
-                progress_text = progress_bar(current, total, filename, "📤 UPLOADING", episode_text)
+                progress_text = progress_bar(current, total, "📤 UPLOADING", episode_text)
                 try:
                     await status_msg.edit_text(progress_text)
                 except:
                     pass
                 last_progress_update = now
         
-        # Upload as video
+        # Send as video with correct filename
         await client.send_video(
             chat_id=user_id,
             video=download_path,
             caption=f"**{filename}**",
             thumb=thumb_path,
+            file_name=filename,  # This sets the actual filename
             supports_streaming=True,
             progress=progress_callback
         )
@@ -281,7 +309,7 @@ async def delete_thumbnail(client, message: Message):
     else:
         await message.reply_text("❌ No thumbnail found")
 
-# Handle URLs - Single mode (process immediately in parallel)
+# Handle URLs - Process all in parallel
 @app.on_message(filters.text & filters.private)
 async def handle_urls(client, message: Message):
     text = message.text.strip()
@@ -289,26 +317,23 @@ async def handle_urls(client, message: Message):
     
     # Skip commands
     if text.startswith('/'):
-        # Check for finish command
         if text == "/finish" and user_id in user_batch_urls and user_batch_urls[user_id]:
             await process_batch(client, message)
         return
     
-    # Check if it's multiple URLs (one per line)
+    # Check for URLs
     urls = [u.strip() for u in text.split('\n') if u.strip().startswith(('http://', 'https://'))]
     
-    if len(urls) > 1:
-        # Multiple URLs in one message - process all in parallel
-        await message.reply_text(f"✅ **Processing {len(urls)} videos in parallel!**\n\nAll videos will download and upload simultaneously.")
+    if urls:
+        # Process ALL videos in parallel
+        total = len(urls)
+        await message.reply_text(f"✅ **Processing {total} videos in PARALLEL!**\n\nAll videos will download AND upload simultaneously.")
         
-        # Get thumbnail
         thumb_path = user_thumb.get(user_id) if user_id in user_thumb and os.path.exists(user_thumb[user_id]) else None
-        
-        # Get pattern
         pattern = user_rename_pattern.get(user_id)
         start_episode = user_episode_counter.get(user_id, 1)
         
-        # Create tasks for all videos
+        # Create tasks for ALL videos
         tasks = []
         for idx, url in enumerate(urls):
             episode_num = start_episode + idx
@@ -322,7 +347,7 @@ async def handle_urls(client, message: Message):
                 else:
                     filename = file_info['filename']
                 
-                task = process_video_parallel(client, user_id, url, filename, thumb_path, episode_num, len(urls))
+                task = process_video_parallel(client, user_id, url, filename, thumb_path, episode_num, total)
                 tasks.append(task)
         
         # Run ALL tasks in parallel (simultaneously)
@@ -330,46 +355,25 @@ async def handle_urls(client, message: Message):
         
         # Update episode counter
         if pattern:
-            user_episode_counter[user_id] = start_episode + len(urls)
-        
-    elif len(urls) == 1:
-        # Single URL - also process with parallel capability
-        file_info = get_file_info(urls[0])
-        if file_info:
-            thumb_path = user_thumb.get(user_id) if user_id in user_thumb and os.path.exists(user_thumb[user_id]) else None
-            pattern = user_rename_pattern.get(user_id)
-            episode_num = user_episode_counter.get(user_id, 1)
-            
-            if pattern:
-                episode_name = generate_episode_name(pattern, episode_num)
-                ext = file_info['filename'].split('.')[-1] if '.' in file_info['filename'] else 'mp4'
-                filename = f"{episode_name}.{ext}"
-                user_episode_counter[user_id] = episode_num + 1
-            else:
-                filename = file_info['filename']
-            
-            await process_video_parallel(client, user_id, urls[0], filename, thumb_path, 1, 1)
+            user_episode_counter[user_id] = start_episode + total
     else:
-        # Not a URL, add to batch if in batch mode
+        # Add to batch queue
         if user_id not in user_batch_urls:
             user_batch_urls[user_id] = []
         
-        if text.startswith(('http://', 'https://')):
-            user_batch_urls[user_id].append(text)
-            total = len(user_batch_urls[user_id])
-            file_info = get_file_info(text)
-            if file_info:
-                size_mb = file_info['size'] / (1024 * 1024)
-                await message.reply_text(
-                    f"✅ **Added to queue!**\n\n"
-                    f"📹 **Video #{total}**\n"
-                    f"📁 `{file_info['filename']}`\n"
-                    f"📊 `{size_mb:.2f} MB`\n\n"
-                    f"📦 **Total:** {total}\n"
-                    f"Type `/finish` to start parallel processing"
-                )
-            else:
-                await message.reply_text(f"✅ **Added URL #{total} to queue!**")
+        user_batch_urls[user_id].append(text)
+        total = len(user_batch_urls[user_id])
+        file_info = get_file_info(text)
+        if file_info:
+            size_mb = file_info['size'] / (1024 * 1024)
+            await message.reply_text(
+                f"✅ **Added to queue!**\n\n"
+                f"📹 **Video #{total}**\n"
+                f"📁 `{file_info['filename']}`\n"
+                f"📊 `{size_mb:.2f} MB`\n\n"
+                f"📦 **Total:** {total}\n"
+                f"Type `/finish` to start parallel processing"
+            )
 
 # Process batch
 async def process_batch(client, message):
@@ -382,16 +386,13 @@ async def process_batch(client, message):
     urls = user_batch_urls[user_id]
     total = len(urls)
     
-    await message.reply_text(f"✅ **Processing {total} videos in parallel!**\n\nAll videos will download and upload simultaneously.")
+    await message.reply_text(f"✅ **Processing {total} videos in PARALLEL!**\n\nAll videos will download AND upload simultaneously.")
     
-    # Get thumbnail
     thumb_path = user_thumb.get(user_id) if user_id in user_thumb and os.path.exists(user_thumb[user_id]) else None
-    
-    # Get pattern
     pattern = user_rename_pattern.get(user_id)
     start_episode = user_episode_counter.get(user_id, 1)
     
-    # Create tasks for all videos
+    # Create tasks for ALL videos
     tasks = []
     for idx, url in enumerate(urls):
         episode_num = start_episode + idx
@@ -420,8 +421,27 @@ async def process_batch(client, message):
     
     await message.reply_text(f"✅ **All {total} videos processed!**")
 
+# HTTP Server for Render Web Service
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
 # Run bot
 if __name__ == "__main__":
-    print("🚀 TRUE PARALLEL VIDEO UPLOADER BOT Started!")
+    print("🚀 PARALLEL VIDEO UPLOADER BOT Started!")
     print("📝 ALL videos download AND upload simultaneously!")
+    
+    # Start HTTP server for Render Web Service
+    http_thread = threading.Thread(target=run_http_server, daemon=True)
+    http_thread.start()
+    print(f"✅ HTTP Server running on port {os.environ.get('PORT', 10000)}")
+    
+    # Run the bot
     app.run()
